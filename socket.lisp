@@ -215,3 +215,12 @@
 	(when (= err -1)
 	  (error (make-condition 'socket-error :msg (errno))))
 	socket))))
+
+(defun accept (socket)
+  (with-foreign-objects ((addr '(:struct sockaddr-in))
+			 (len :socklen-t))
+    (setf (mem-ref len :socklen-t) (foreign-type-size '(:struct sockaddr-in)))
+    (let ((err (socket-accept (socket-fd socket) addr len)))
+      (when (= err -1)
+	(error (make-condition 'socket-error :msg (errno))))
+      (make-instance 'socket :fd err))))

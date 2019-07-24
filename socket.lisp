@@ -1,6 +1,6 @@
 (in-package :socket)
 
-(defclass socket (t)
+(defclass socket ()
   ((fd :type (signed-byte 32) :initarg :fd :initform -1 :reader socket-fd)))
 
 (defclass listen-socket (socket)
@@ -63,10 +63,12 @@
   (arg :int))
 
 (defmethod print-object ((sock socket) stream)
-  (format stream "#<socket: fd=~a>" (socket-fd sock)))
+  (format stream "#<socket: fd=~a>"
+	  (socket-fd sock)))
 
 (defmethod print-object ((sock listen-socket) stream)
-  (format stream "#<listen-socket: fd=~a, port=~a>" (socket-fd sock) (socket-listen-port sock)))
+  (format stream "#<listen-socket: fd=~a, port=~a>"
+	  (socket-fd sock) (socket-listen-port sock)))
 
 (define-condition socket-error ()
   ((fd :type (signed-byte 32) :initform -1 :initarg :fd)
@@ -146,32 +148,31 @@
       (error (make-condition 'socket-error :msg (errno))))
     (make-instance 'socket :fd desc)))
 
-(defun send (socket buf)
-  (with-foreign-object (fbuf :uint8 (length buf))
-    (loop
-       for i from 0 below (length buf)
-       for c across buf do (setf (mem-aref fbuf :uint8 i) (char-code (aref buf i))))
-    (let ((err (socket-write (socket-fd socket) fbuf (length buf))))
-      (when (= err -1)
-	(cond
-	  ((= *errno* +EWOULDBLOCK+)
-	   (error (make-condition 'operation-would-block :fd (socket-fd socket))))
-	  (t
-	   (error (make-condition 'socket-write-error :msg (errno))))))
-      err)))
+(defun send (socket buf len)
+  (let ((err (socket-write (socket-fd socket) buf len)))
+    (when (= err -1)
+      (cond
+	((= *errno* +EWOULDBLOCK+)
+	 (error (make-condition 'operation-would-block :fd (socket-fd socket))))
+	(t (error (make-condition 'socket-write-error :msg (errno))))))
+    err))
 
-(defun receive (socket buf)
-  (with-foreign-object (fbuf :uint8 (length buf))
-    (let ((err (socket-read (socket-fd socket) fbuf (length buf))))
-      (when (= err -1)
-	(cond
-	  ((= *errno* +EWOULDBLOCK+)
-	   (error (make-condition 'operation-would-block :fd (socket-fd socket))))
-	  (t
-	   (error (make-condition 'socket-read-error :msg (errno))))))
-      (loop for i from 0 below err
-	 do (setf (aref buf i) (mem-aref fbuf :uint8 i)))
-      err)))
+(defun receive (socket bufaddrs lens)
+  (with-foreign-object (iovs '(:struct iovec) (length lens))
+    (labels ((fill-iov (iov addr len)
+	       (with-foreign-slots ((iov-base iov-len) iov (:struct iovec))
+		 (setf iov-base addr iov-len len))))
+      (mapcar #'fill-iov
+	      (loop for i from 0 below (length lens) collect (mem-aptr iovs '(:struct iovec) i))
+	      bufaddrs
+	      lens))
+    (let ((nread (socket-readv (socket-fd socket) iovs (length lens))))
+      (cond
+	((= nread -1)
+	 (error (make-condition 'socket-read-error :msg (errno) :fd (socket-fd socket))))
+	((= nread 0)
+	 (error (make-condition 'socket-read-error :msg (errno) :fd (socket-fd socket))))
+	(t nread)))))
 
 (defun connect (socket peer-addr port)
   (with-foreign-object (addr '(:struct sockaddr-in))

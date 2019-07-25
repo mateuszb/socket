@@ -105,6 +105,9 @@
 (define-condition operation-would-block ()
   ((fd :type (signed-byte 32) :initform -1 :initarg fd)))
 
+(define-condition operation-interrupted ()
+  ())
+
 (defcfun strerror :string
   (errno :int))
 
@@ -158,6 +161,7 @@
     err))
 
 (defun receive (socket bufaddrs lens)
+  (format t "receive ~a ~a~%" bufaddrs lens)
   (with-foreign-object (iovs '(:struct iovec) (length lens))
     (labels ((fill-iov (iov addr len)
 	       (with-foreign-slots ((iov-base iov-len) iov (:struct iovec))
@@ -169,7 +173,13 @@
     (let ((nread (socket-readv (socket-fd socket) iovs (length lens))))
       (cond
 	((= nread -1)
-	 (error (make-condition 'socket-read-error :msg (errno) :fd (socket-fd socket))))
+	 (cond
+	   ((= *errno* +EINTR+)
+	    (error (make-condition 'operation-interrupted)))
+	   ((or (= *errno* +EAGAIN+) (= *errno* +EWOULDBLOCK+))
+	    (error (make-condition 'operation-would-block)))
+	   (t
+	    (error (make-condition 'socket-read-error :msg (errno) :fd (socket-fd socket))))))
 	((= nread 0)
 	 (error (make-condition 'socket-read-error :msg (errno) :fd (socket-fd socket))))
 	(t nread)))))
@@ -218,10 +228,13 @@
 	socket))))
 
 (defun accept (socket)
-  (with-foreign-objects ((addr '(:struct sockaddr-in))
-			 (len :socklen-t))
+  (with-foreign-objects ((addr '(:struct sockaddr-in)) (len :socklen-t))
     (setf (mem-ref len :socklen-t) (foreign-type-size '(:struct sockaddr-in)))
-    (let ((err (socket-accept (socket-fd socket) addr len)))
-      (when (= err -1)
-	(error (make-condition 'socket-error :msg (errno))))
-      (make-instance 'socket :fd err))))
+    (let ((newsock (socket-accept (socket-fd socket) addr len)))
+      (when (= newsock -1)
+	(cond
+	  ((= *errno* +EINTR+) (error (make-condition 'operation-interrupted)))
+	  ((or (= *errno* +EAGAIN+) (= *errno* +EWOULDBLOCK+))
+	   (error (make-condition 'operation-would-block :fd (socket-fd socket))))
+	  (t (error (make-condition 'socket-error :msg (errno) :fd (socket-fd socket))))))
+      (make-instance 'socket :fd newsock))))

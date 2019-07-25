@@ -13,6 +13,7 @@
    :socket-fd
    :operation-in-progress
    :operation-would-block
+   :operation-interrupted
    :socket-error
    :socket-read-error
    :socket-write-error))

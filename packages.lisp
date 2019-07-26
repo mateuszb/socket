@@ -16,4 +16,5 @@
    :operation-interrupted
    :socket-error
    :socket-read-error
-   :socket-write-error))
+   :socket-write-error
+   :socket-eof))

@@ -108,6 +108,9 @@
 (define-condition operation-interrupted ()
   ())
 
+(define-condition socket-eof ()
+  ((fd :type (signed-byte 32) :initform -1 :initarg :fd)))
+
 (defcfun strerror :string
   (errno :int))
 
@@ -181,7 +184,7 @@
 	   (t
 	    (error (make-condition 'socket-read-error :msg (errno) :fd (socket-fd socket))))))
 	((= nread 0)
-	 (error (make-condition 'socket-read-error :msg (errno) :fd (socket-fd socket))))
+	 (error (make-condition 'socket-eof :fd (socket-fd socket))))
 	(t nread)))))
 
 (defun connect (socket peer-addr port)

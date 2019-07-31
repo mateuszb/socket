@@ -62,6 +62,11 @@
   (cmd :int)
   (arg :int))
 
+(defcfun (getpeername "getpeername") :int
+  (fd :int)
+  (addr (:pointer (:struct sockaddr-in)))
+  (addrlen (:pointer :socklen-t)))
+
 (defmethod print-object ((sock socket) stream)
   (format stream "#<socket: fd=~a>"
 	  (socket-fd sock)))
@@ -125,6 +130,10 @@
 	    (when (and x y)
 	      (logior (ash x 8) y)))
 	  vec))
+
+(defun uint->vec (uint32)
+  (loop for lowbit from 0 upto 24 by 8
+     collect (ldb (byte 8 lowbit) uint32)))
 
 (defun make-tcp-listen-socket (port &optional (bind-address #(0 0 0 0)) (backlog 10))
   (let ((desc (socket +AF-INET+ +SOCK-STREAM+ 0)))
@@ -241,3 +250,18 @@
 	   (error (make-condition 'operation-would-block :fd (socket-fd socket))))
 	  (t (error (make-condition 'socket-error :msg (errno) :fd (socket-fd socket))))))
       (make-instance 'socket :fd newsock))))
+
+(defun get-peer-name (socket)
+  (with-foreign-objects ((addr '(:struct sockaddr-in)) (len :socklen-t))
+    (setf (mem-ref len :socklen-t) (foreign-type-size '(:struct sockaddr-in)))
+    (loop for i from 0 below (foreign-type-size '(:struct sockaddr-in))
+       do (setf (mem-aref addr :uint8 i) 0))
+    (format t "addr = ~a~%" addr)
+    (let ((err (getpeername socket addr len)))
+      (format t "len ret = ~a, err = ~a, errno=~a~%" len err (errno))
+      (unless (= err -1)
+	(with-foreign-slots (((:pointer sin-addr) sin-port) addr (:struct sockaddr-in))
+	  (with-foreign-slots ((s-addr) sin-addr (:struct in-addr))
+	    (format t "s-addr: ~a~%" (uint->vec s-addr))
+	    (uint->vec s-addr))
+	  )))))

@@ -17,4 +17,5 @@
    :socket-error
    :socket-read-error
    :socket-write-error
-   :socket-eof))
+   :socket-eof
+   :get-peer-name))

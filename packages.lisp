@@ -18,4 +18,6 @@
    :socket-read-error
    :socket-write-error
    :socket-eof
-   :get-peer-name))
+   :get-peer-name
+   :get-host-addr
+   :get-host-addrs))

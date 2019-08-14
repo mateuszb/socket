@@ -67,6 +67,9 @@
   (addr (:pointer (:struct sockaddr-in)))
   (addrlen (:pointer :socklen-t)))
 
+(defcfun (gethostbyname "gethostbyname") (:pointer (:struct hostent))
+  (hostname :string))
+
 (defmethod print-object ((sock socket) stream)
   (format stream "#<socket: fd=~a>"
 	  (socket-fd sock)))
@@ -260,3 +263,16 @@
 	(with-foreign-slots (((:pointer sin-addr) sin-port) addr (:struct sockaddr-in))
 	  (with-foreign-slots ((s-addr) sin-addr (:struct in-addr))
 	    (uint->vec s-addr)))))))
+
+(defun get-host-addrs (hostname)
+  (let ((addr (gethostbyname hostname)))
+    (with-foreign-slots ((len addr-list) addr (:struct hostent))
+      (loop for i from 0 below 10
+	 for ent = (mem-aref addr-list :pointer i)
+	 then (mem-aref addr-list :pointer i)
+	 until (pointer-eq (null-pointer) ent)
+	 collect
+	   (uint->vec (foreign-slot-value ent '(:struct in-addr) 's-addr))))))
+
+(defun get-host-addr (hostname)
+  (car (get-host-addrs hostname)))

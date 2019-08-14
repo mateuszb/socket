@@ -5,6 +5,7 @@
 	   "sys/socket.h"
 	   "sys/ioctl.h"
 	   "netinet/in.h"
+	   "netdb.h"
 	   "errno.h"
 	   "string.h"
 	   "unistd.h"
@@ -46,4 +47,11 @@
 
   (cstruct iovec "struct iovec"
 	   (iov-base "iov_base" :type :pointer)
-	   (iov-len "iov_len" :type :size-t)))
+	   (iov-len "iov_len" :type :size-t))
+
+  (cstruct hostent "struct hostent"
+	   (name "h_name" :type :pointer)
+	   (aliases "h_aliases" :type :pointer)
+	   (addr-type "h_addrtype" :type :int)
+	   (len "h_length" :type :int)
+	   (addr-list "h_addr_list" :type :pointer)))

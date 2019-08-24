@@ -18,6 +18,7 @@
    :socket-read-error
    :socket-write-error
    :socket-eof
+   :get-rxbytes
    :get-peer-name
    :get-host-addr
    :get-host-addrs))

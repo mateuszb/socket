@@ -70,6 +70,18 @@
 (defcfun (gethostbyname "gethostbyname") (:pointer (:struct hostent))
   (hostname :string))
 
+(defcfun (ioctl "ioctl") :int
+  (fd :int)
+  (request :ulong)
+  (ptr :pointer))
+
+(defun get-rxbytes (fd)
+  (with-foreign-object (rxbytes :int32)
+    (let ((err (ioctl (socket-fd fd) +FIONREAD+ rxbytes)))
+      (cond
+	((< err 0) (error 'ioctl-failed))
+	(t (cffi:mem-ref rxbytes :int32))))))
+
 (defmethod print-object ((sock socket) stream)
   (format stream "#<socket: fd=~a>"
 	  (socket-fd sock)))

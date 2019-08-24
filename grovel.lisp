@@ -30,6 +30,8 @@
   (constant (+EINTR+ "EINTR"))
   (constant (+EIO+ "EIO"))
 
+  (constant (+FIONREAD+ "FIONREAD"))
+
   (ctype :size-t "size_t")
   (ctype :ssize-t "ssize_t")
   (ctype :socklen-t "socklen_t")

@@ -53,6 +53,10 @@
 (defcfun (socket-close "close") :int
   (fd :int))
 
+(defcfun (socket-shutdown "shutdown") :int
+  (fd :int)
+  (how :int))
+
 (defcfun (fcntl-getfl "fcntl") :int
   (fd :int)
   (cmd :int))
@@ -172,11 +176,14 @@
 
     (make-instance 'listen-socket :port port :fd desc)))
 
-(defun make-tcp-socket ()
+(defun make-tcp-socket (&optional non-blocking-p)
   (let ((desc (socket +AF-INET+ +SOCK-STREAM+ 0)))
     (when (= desc -1)
       (error (make-condition 'socket-error :msg (errno))))
-    (make-instance 'socket :fd desc)))
+    (let ((socket (make-instance 'socket :fd desc)))
+      (when non-blocking-p
+	(set-non-blocking socket))
+      socket)))
 
 (defun send (socket buf len)
   (let ((err (socket-write (socket-fd socket) buf len)))
@@ -233,7 +240,7 @@
   socket)
 
 (defun disconnect (socket)
-  (let ((err (socket-close (socket-fd socket))))
+  (let ((err (socket-shutdown (socket-fd socket) +SHUT-RDWR+)))
     (when (= err -1)
       (error (make-condition 'socket-error :fd (socket-fd socket) :msg (errno))))))
 

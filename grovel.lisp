@@ -32,6 +32,10 @@
 
   (constant (+FIONREAD+ "FIONREAD"))
 
+  (constant (+SHUT-RDWR+ "SHUT_RDWR"))
+  (constant (+SHUT-RD+ "SHUT_RD"))
+  (constant (+SHUT-WR+ "SHUT_WR"))
+
   (ctype :size-t "size_t")
   (ctype :ssize-t "ssize_t")
   (ctype :socklen-t "socklen_t")

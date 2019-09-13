@@ -242,7 +242,13 @@
 (defun disconnect (socket)
   (let ((err (socket-shutdown (socket-fd socket) +SHUT-RDWR+)))
     (when (= err -1)
-      (error (make-condition 'socket-error :fd (socket-fd socket) :msg (errno))))))
+      (cond
+	((= *errno* +ENOTCONN+)
+	 (format t "warning: socket already disconnected~%"))
+
+	(t
+	 (error
+	  (make-condition 'socket-error :fd (socket-fd socket) :msg (errno))))))))
 
 (defun set-non-blocking (socket)
   (let ((fd (socket-fd socket)))

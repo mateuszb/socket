@@ -29,6 +29,7 @@
   (constant (+EINPROGRESS+ "EINPROGRESS"))
   (constant (+EINTR+ "EINTR"))
   (constant (+EIO+ "EIO"))
+  (constant (+ENOTCONN+ "ENOTCONN"))
 
   (constant (+FIONREAD+ "FIONREAD"))
 

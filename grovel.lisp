@@ -11,7 +11,6 @@
 	   "unistd.h"
 	   "fcntl.h")
 
-  (cvar ("errno" *errno*) :int)
   (constant (+af-inet+ "AF_INET"))
   (constant (+af-inet6+ "AF_INET6"))
   (constant (+sock-stream+ "SOCK_STREAM"))
@@ -62,3 +61,12 @@
 	   (addr-type "h_addrtype" :type :int)
 	   (len "h_length" :type :int)
 	   (addr-list "h_addr_list" :type :pointer)))
+
+#+freebsd
+(progn
+  )
+
+#+linux
+(progn
+  (cvar ("errno" *errno*) :int)
+  )

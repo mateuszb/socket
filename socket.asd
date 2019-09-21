@@ -6,7 +6,10 @@
   :serial t
   :components ((:file "packages")
 	       (:cffi-grovel-file "grovel" :depends-on ("packages"))
+	       #+freebsd
+	       (:file "freebsd" :depends-on ("packages"))
 	       (:file "socket" :depends-on ("packages" "grovel")))
+
   :depends-on ("cffi")
   :in-order-to ((test-op (test-op "socket/tests")))
   :description "A lightweight socket library that is easy to integrate with epoll/kqueue mechanisms.")

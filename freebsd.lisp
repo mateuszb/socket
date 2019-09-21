@@ -1,3 +1,3 @@
 (in-package :socket)
 
-(defcvar ("errno" errno) :int)
+(defcvar ("errno" *errno*) :int)

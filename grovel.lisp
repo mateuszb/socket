@@ -11,30 +11,52 @@
 	   "unistd.h"
 	   "fcntl.h")
 
-  (constant (+af-inet+ "AF_INET"))
-  (constant (+af-inet6+ "AF_INET6"))
-  (constant (+sock-stream+ "SOCK_STREAM"))
+  (constantenum
+   (address-family :base-type :int :define-constants t)
+   ((:af-inet "AF_INET"))
+   ((:af-inet6 "AF_INET6")))
 
-  (constant (+SOL-SOCKET+ "SOL_SOCKET"))
-  (constant (+SO-REUSEADDR+ "SO_REUSEADDR"))
+  (constantenum
+   (socket-type :base-type :int :define-constants t)
+   ((:sock-stream "SOCK_STREAM")))
+
+  (constantenum
+   (socket-opt-level :base-type :int :define-constants t)
+   ((:sol-socket "SOL_SOCKET")))
+
+  (constantenum
+   (socket-opt :base-type :int :define-constants t)
+   ((:SO-REUSEADDR "SO_REUSEADDR"))
+   ((:SO-REUSEPORT "SO_REUSEPORT"))
+   ((:SO-KEEPALIVE "SO_KEEPALIVE"))
+   ((:SO-LINGER "SO_LINGER"))
+   ((:SO-SNDBUF "SO_SNDBUF"))
+   ((:SO-RCVBUF "SO_RCVBUF"))
+   ((:SO-RCVTIMEO "SO_RCVTIMEO"))
+   ((:SO-SNDTIMEO "SO_SNDTIMEO")))
 
   (constant (+F-SETFL+ "F_SETFL"))
   (constant (+F-GETFL+ "F_GETFL"))
 
   (constant (+O-NONBLOCK+ "O_NONBLOCK"))
 
-  (constant (+EAGAIN+ "EAGAIN"))
-  (constant (+EWOULDBLOCK+ "EWOULDBLOCK"))
-  (constant (+EINPROGRESS+ "EINPROGRESS"))
-  (constant (+EINTR+ "EINTR"))
-  (constant (+EIO+ "EIO"))
-  (constant (+ENOTCONN+ "ENOTCONN"))
+  (constantenum
+   (error-code :base-type :int)
+   ((:EAGAIN "EAGAIN"))
+   ((:EWOULDBLOCK "EWOULDBLOCK"))
+   ((:EINPROGRESS "EINPROGRESS"))
+   ((:EINTR "EINTR"))
+   ((:EIO "EIO"))
+   ((:ENOTCONN "ENOTCONN"))
+   ((:ECONNRESET "ECONNRESET")))
 
   (constant (+FIONREAD+ "FIONREAD"))
 
-  (constant (+SHUT-RDWR+ "SHUT_RDWR"))
-  (constant (+SHUT-RD+ "SHUT_RD"))
-  (constant (+SHUT-WR+ "SHUT_WR"))
+  (constantenum
+   (direction :base-type :int :define-constants t)
+   ((:SHUT-RD "SHUT_RD"))
+   ((:SHUT-WR "SHUT_WR"))
+   ((:SHUT-RDWR "SHUT_RDWR")))
 
   (ctype :size-t "size_t")
   (ctype :ssize-t "ssize_t")
@@ -60,7 +82,9 @@
 	   (aliases "h_aliases" :type :pointer)
 	   (addr-type "h_addrtype" :type :int)
 	   (len "h_length" :type :int)
-	   (addr-list "h_addr_list" :type :pointer)))
+	   (addr-list "h_addr_list" :type :pointer))
+
+  )
 
 #+freebsd
 (progn

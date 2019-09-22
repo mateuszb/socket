@@ -21,4 +21,6 @@
    :get-rxbytes
    :get-peer-name
    :get-host-addr
-   :get-host-addrs))
+   :get-host-addrs
+   :set-reuse-addr
+   :set-reuse-port))

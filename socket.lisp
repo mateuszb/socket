@@ -7,8 +7,8 @@
   ((port :type (unsigned-byte 16) :initarg :port :initform 0 :reader socket-listen-port)))
 
 (defcfun socket :int
-  (domain :int)
-  (type :int)
+  (domain address-family)
+  (type socket-type)
   (proto :int))
 
 (defcfun bind :int
@@ -55,7 +55,7 @@
 
 (defcfun (socket-shutdown "shutdown") :int
   (fd :int)
-  (how :int))
+  (how direction))
 
 (defcfun (fcntl-getfl "fcntl") :int
   (fd :int)
@@ -78,6 +78,13 @@
   (fd :int)
   (request :ulong)
   (ptr :pointer))
+
+(defcfun (setsockopt "setsockopt") :int
+  (fd :int)
+  (level socket-opt-level)
+  (optname socket-opt)
+  (optval :pointer)
+  (optlen :socklen-t))
 
 (defun get-rxbytes (fd)
   (with-foreign-object (rxbytes :int32)
@@ -139,7 +146,7 @@
   (errno :int))
 
 (defun errno ()
-  (strerror *errno*))
+  (strerror raw-errno))
 
 (defun bswap16 (x)
   (logior (ash x -8) (logand (ash x 8) #xFF00)))
@@ -155,31 +162,38 @@
      collect (ldb (byte 8 lowbit) uint32)))
 
 (defun make-tcp-listen-socket (port &optional (bind-address #(0 0 0 0)) (backlog 10))
-  (let ((desc (socket +AF-INET+ +SOCK-STREAM+ 0)))
+  (let ((desc (socket :AF-INET :SOCK-STREAM 0)))
     (when (= desc -1)
-      (error (make-condition 'socket-error :msg (errno))))
+      (error 'socket-error :msg (errno)))
 
+    (with-foreign-object (opt :int)
+      (let ((err (setsockopt desc :SOL-SOCKET
+			     :SO-REUSEPORT opt
+			     (foreign-type-size :int))))
+	(when (= err -1)
+	  (error 'socket-error :fd desc :msg (strerror *errno*)))))
+	
     (with-foreign-object (addr '(:struct sockaddr-in))
       (with-foreign-slots ((sin-family sin-port (:pointer sin-addr)) addr (:struct sockaddr-in))
 	(with-foreign-slots ((s-addr) sin-addr (:struct in-addr))
-	  (setf sin-family +AF-INET+
+	  (setf sin-family (convert-to-foreign :AF-INET 'address-family)
 		sin-port (bswap16 port)
 		s-addr (vec->uint (reverse bind-address)))))
 
       (let ((err (bind desc addr (foreign-type-size '(:struct sockaddr-in)))))
 	(when (= err -1)
-	  (error (make-condition 'socket-bind-error :port port :fd desc :msg (errno)))))
+	  (error 'socket-bind-error :port port :fd desc :msg (errno))))
 
       (let ((err (socket-listen desc backlog)))
 	(when (= err -1)
-	  (error (make-condition 'socket-listen-error :port port :fd desc :msg (errno))))))
+	  (error 'socket-listen-error :port port :fd desc :msg (errno)))))
 
     (make-instance 'listen-socket :port port :fd desc)))
 
 (defun make-tcp-socket (&optional non-blocking-p)
-  (let ((desc (socket +AF-INET+ +SOCK-STREAM+ 0)))
+  (let ((desc (socket :AF-INET :SOCK-STREAM 0)))
     (when (= desc -1)
-      (error (make-condition 'socket-error :msg (errno))))
+      (error 'socket-error :msg (errno)))
     (let ((socket (make-instance 'socket :fd desc)))
       (when non-blocking-p
 	(set-non-blocking socket))
@@ -188,10 +202,10 @@
 (defun send (socket buf len)
   (let ((err (socket-write (socket-fd socket) buf len)))
     (when (= err -1)
-      (cond
-	((= *errno* +EWOULDBLOCK+)
-	 (error (make-condition 'operation-would-block :fd (socket-fd socket))))
-	(t (error (make-condition 'socket-write-error :msg (errno))))))
+      (case *errno*
+	(EWOULDBLOCK
+	 (error 'operation-would-block :fd (socket-fd socket)))
+	(t (error 'socket-write-error :msg (errno)))))
     err))
 
 (defun receive (socket bufaddrs lens)
@@ -200,62 +214,67 @@
 	       (with-foreign-slots ((iov-base iov-len) iov (:struct iovec))
 		 (setf iov-base addr iov-len len))))
       (mapcar #'fill-iov
-	      (loop for i from 0 below (length lens) collect (mem-aptr iovs '(:struct iovec) i))
+	      (loop for i from 0 below (length lens)
+		 collect (mem-aptr iovs '(:struct iovec) i))
 	      bufaddrs
 	      lens))
     (let ((nread (socket-readv (socket-fd socket) iovs (length lens))))
       (cond
 	((= nread -1)
-	 (cond
-	   ((= *errno* +EINTR+)
-	    (error (make-condition 'operation-interrupted)))
-	   ((or (= *errno* +EAGAIN+) (= *errno* +EWOULDBLOCK+))
-	    (error (make-condition 'operation-would-block)))
+	 (case *errno*
+	   (EINTR
+	    (error 'operation-interrupted))
+	   ((EAGAIN EWOULDBLOCK)
+	    (error 'operation-would-block))
 	   (t
-	    (error (make-condition 'socket-read-error :msg (errno) :fd (socket-fd socket))))))
+	    (error 'socket-read-error :msg (errno) :fd (socket-fd socket)))))
 	((= nread 0)
-	 (error (make-condition 'socket-eof :fd (socket-fd socket))))
+	 (error 'socket-eof :fd (socket-fd socket)))
 	(t nread)))))
 
 (defun connect (socket peer-addr port)
   (with-foreign-object (addr '(:struct sockaddr-in))
     (with-foreign-slots ((sin-family sin-port (:pointer sin-addr)) addr (:struct sockaddr-in))
       (with-foreign-slots ((s-addr) sin-addr (:struct in-addr))
-	(setf sin-family +AF-INET+
+	(setf sin-family (convert-to-foreign :AF-INET 'address-family)
 	      sin-port (bswap16 port)
 	      s-addr (vec->uint (reverse peer-addr)))))
 
-    (let ((err (socket-connect (socket-fd socket) addr (foreign-type-size '(:struct sockaddr-in)))))
-      (when (= err -1)
-	(cond
-	  ((= *errno* +EINPROGRESS+)
-	   (error (make-condition 'socket::operation-in-progress :fd (socket-fd socket))))
+    (let* ((fd (socket-fd socket))
+	   (size (foreign-type-size '(:struct sockaddr-in)))
+	   (status (socket-connect fd addr size))
+	   (errcode *errno*))
+      (when (= status -1)
+	(case errcode
+	  (EINPROGRESS
+	   (error 'socket::operation-in-progress :fd (socket-fd socket)))
 	  (t
+	   (format t "*errno* = ~a~%" errcode)
 	   (error
-	    (make-condition 'socket-connect-error
-			    :peer peer-addr
-			    :port port
-			    :fd (socket-fd socket)
-			    :msg (errno))))))))
+	    'socket-connect-error
+	    :peer peer-addr
+	    :port port
+	    :fd (socket-fd socket)
+	    :msg *errno*))))))
   socket)
 
 (defun disconnect (socket)
-  (let ((err (socket-shutdown (socket-fd socket) +SHUT-RDWR+)))
+  (let ((err (socket-shutdown (socket-fd socket) :SHUT-RDWR)))
     (when (= err -1)
-      (cond
-	((= *errno* +ENOTCONN+)
+      (case *errno*
+	(ENOTCONN
 	 (format t "warning: socket already disconnected~%"))
 
 	(t
 	 (error
-	  (make-condition 'socket-error :fd (socket-fd socket) :msg (errno))))))))
+	  'socket-error :fd (socket-fd socket) :msg (strerror raw-errno)))))))
 
 (defun set-non-blocking (socket)
   (let ((fd (socket-fd socket)))
     (let ((flags (fcntl-getfl fd +F-GETFL+)))
       (let ((err (fcntl-setfl fd +F-SETFL+ (logior flags +O-NONBLOCK+))))
 	(when (= err -1)
-	  (error (make-condition 'socket-error :msg (errno))))
+	  (error 'socket-error :msg (errno)))
 	t))))
 
 (defun set-blocking (socket)
@@ -263,19 +282,23 @@
     (let ((flags (fcntl-getfl fd +F-GETFL+)))
       (let ((err (fcntl-setfl fd +F-SETFL+ (logand flags (lognot +O-NONBLOCK+)))))
 	(when (= err -1)
-	  (error (make-condition 'socket-error :msg (errno))))
+	  (error 'socket-error :msg (errno)))
 	socket))))
 
 (defun accept (socket)
   (with-foreign-objects ((addr '(:struct sockaddr-in)) (len :socklen-t))
     (setf (mem-ref len :socklen-t) (foreign-type-size '(:struct sockaddr-in)))
-    (let ((newsock (socket-accept (socket-fd socket) addr len)))
+    (let ((newsock (socket-accept (socket-fd socket) addr len))
+	  (error-code *errno*))
       (when (= newsock -1)
-	(cond
-	  ((= *errno* +EINTR+) (error (make-condition 'operation-interrupted)))
-	  ((or (= *errno* +EAGAIN+) (= *errno* +EWOULDBLOCK+))
-	   (error (make-condition 'operation-would-block :fd (socket-fd socket))))
-	  (t (error (make-condition 'socket-error :msg (errno) :fd (socket-fd socket))))))
+	(format t "ACCEPT ERROR: ~a~%" error-code)
+	(case error-code
+	  (EINTR (error 'operation-interrupted))
+	  (EAGAIN
+	   (error 'operation-would-block :fd (socket-fd socket)))
+	  (EWOULDBLOCK
+	   (error 'operation-would-block :fd (socket-fd socket)))
+	  (t (error 'socket-error :msg error-code :fd (socket-fd socket)))))
       (make-instance 'socket :fd newsock))))
 
 (defun get-peer-name (socket)
@@ -301,3 +324,25 @@
 
 (defun get-host-addr (hostname)
   (car (get-host-addrs hostname)))
+
+(defun set-reuse-addr (socket)
+  (let ((fd (socket-fd socket)))
+    (with-foreign-object (opt :int)
+      (setf opt 1)
+      (let ((err (setsockopt fd :SOL-SOCKET
+			     :SO-REUSEADDR opt
+			     (foreign-type-size :int))))
+	(cond
+	  ((= err -1) (error 'socket-error :fd fd :msg (strerror *errno*)))
+	  (t socket))))))
+
+(defun set-reuse-port (socket)
+  (let ((fd (socket-fd socket)))
+    (with-foreign-object (opt :int)
+      (setf opt 1)
+      (let ((err (setsockopt fd :SOL-SOCKET
+			     :SO-REUSEPORT opt
+			     (foreign-type-size :int))))
+	(cond
+	  ((= err -1) (error 'socket-error :fd fd :msg (strerror *errno*)))
+	  (t socket))))))

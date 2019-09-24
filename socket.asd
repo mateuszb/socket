@@ -6,8 +6,6 @@
   :serial t
   :components ((:file "packages")
 	       (:cffi-grovel-file "grovel" :depends-on ("packages"))
-	       #+freebsd
-	       (:file "freebsd" :depends-on ("packages"))
 	       (:file "socket" :depends-on ("packages" "grovel")))
 
   :depends-on ("cffi")

@@ -48,7 +48,21 @@
    ((:EINTR "EINTR"))
    ((:EIO "EIO"))
    ((:ENOTCONN "ENOTCONN"))
-   ((:ECONNRESET "ECONNRESET")))
+   ((:ECONNRESET "ECONNRESET"))
+   ((:EBADF "EBADF"))
+   ((:EACCESS "EACCESS"))
+   ((:ENOTSOCK "ENOTSOCK"))
+   ((:EFAULT "EFAULT"))
+   ((:EMSGSIZE "EMSGSIZE"))
+   ((:ENOBUFS "ENOBUFS"))
+   ((:EHOSTUNREACH "EHOSTUNREACH"))
+   ((:EISCONN "EISCONN"))
+   ((:ECONNREFUSED "ECONNREFUSED"))
+   ((:EHOSTDOWN "EHOSTDOWN"))
+   ((:ENETDOWN "ENETDOWN"))
+   ((:EADDRNOTAVAIL "EADDRNOTAVAIL"))
+   ((:EPIPE "EPIPE"))
+   )
 
   (constant (+FIONREAD+ "FIONREAD"))
 
@@ -86,11 +100,3 @@
 
   )
 
-#+freebsd
-(progn
-  )
-
-#+linux
-(progn
-  (cvar ("errno" *errno*) error-code)
-  )

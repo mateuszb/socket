@@ -151,7 +151,16 @@
   ((fd :type (signed-byte 32) :initform -1 :initarg :fd)))
 
 (defun errno ()
-  (sb-impl::get-errno))
+  (let ((code (sb-impl::get-errno)))
+    (cond
+      ((= code EWOULDBLOCK) :EWOULDBLOCK)
+      ((= code EAGAIN) :EAGAIN)
+      ((= code EINPROGRESS) :EINPROGRESS)
+      ((= code EINTR) :EINTR)
+      ((= code EIO) :EIO)
+      ((= code ENOTCONN) :ENOTCONN)
+      ((= code ECONNRESET) :ECONNRESET)
+      (t code))))
 
 (defun strerror (errcode)
   (sb-int:strerror errcode))
@@ -217,8 +226,8 @@
 (defun send (socket buf len)
   (let ((err (socket-write (socket-fd socket) buf len)))
     (when (= err -1)
-      (case *errno*
-	(:EWOULDBLOCK
+      (case (errno)
+	((:EWOULDBLOCK :EAGAIN)
 	 (error 'operation-would-block :fd (socket-fd socket)))
 	(t (error 'socket-write-error :msg (errno)))))
     err))
@@ -236,7 +245,7 @@
     (let ((nread (socket-readv (socket-fd socket) iovs (length lens))))
       (cond
 	((= nread -1)
-	 (case *errno*
+	 (case (errno)
 	   (:EINTR
 	    (error 'operation-interrupted))
 	   ((:EAGAIN :EWOULDBLOCK)
@@ -260,24 +269,23 @@
 	   (size (foreign-type-size '(:struct sockaddr-in)))
 	   (status (socket-connect fd addr size)))
       (when (= status -1)
-	(let ((errcode *errno*))
-	  (case errcode
-	    (:EINPROGRESS
-	     (error 'operation-in-progress :fd (socket-fd socket)))
-	    (t
-	     (format t "*errno* = ~a~%" errcode)
-	     (error
-	      'socket-connect-error
-	      :peer peer-addr
-	      :port port
-	      :fd (socket-fd socket)
-	      :msg errcode)))))))
+	(case (errno)
+	  (:EINPROGRESS
+	   (error 'operation-in-progress :fd (socket-fd socket)))
+	  (t
+	   (format t "*errno* = ~a~%" (errno))
+	   (error
+	    'socket-connect-error
+	    :peer peer-addr
+	    :port port
+	    :fd (socket-fd socket)
+	    :msg (errno)))))))
   socket)
 
 (defun disconnect (socket)
   (let ((err (socket-shutdown (socket-fd socket) :SHUT-RDWR)))
     (when (= err -1)
-      (case *errno*
+      (case (errno)
 	(:ENOTCONN
 	 (format t "warning: socket already disconnected~%"))
 	(t (error
@@ -306,14 +314,13 @@
     (setf (mem-ref len :socklen-t) (foreign-type-size '(:struct sockaddr-in)))
     (let ((newsock (socket-accept (socket-fd socket) addr len)))
       (when (= newsock -1)
-	(let ((error-code *errno*))
-	  (case error-code
-	    (:EINTR (error 'operation-interrupted))
-	    (:EAGAIN
-	     (error 'operation-would-block :fd (socket-fd socket)))
-	    (:EWOULDBLOCK
-	     (error 'operation-would-block :fd (socket-fd socket)))
-	    (t (error 'socket-error :msg error-code :fd (socket-fd socket))))))
+	(case (errno)
+	  (:EINTR (error 'operation-interrupted))
+	  (:EAGAIN
+	   (error 'operation-would-block :fd (socket-fd socket)))
+	  (:EWOULDBLOCK
+	   (error 'operation-would-block :fd (socket-fd socket)))
+	  (t (error 'socket-error :msg (errno) :fd (socket-fd socket)))))
       (make-instance 'socket :fd newsock))))
 
 (defun get-peer-name (socket)

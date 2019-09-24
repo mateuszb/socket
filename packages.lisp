@@ -10,6 +10,7 @@
    :set-non-blocking
    :set-blocking
    :accept
+   :socket
    :socket-fd
    :operation-in-progress
    :operation-would-block

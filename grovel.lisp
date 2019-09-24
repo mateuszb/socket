@@ -41,7 +41,7 @@
   (constant (+O-NONBLOCK+ "O_NONBLOCK"))
 
   (constantenum
-   (error-code :base-type :int)
+   (error-code :base-type :int :define-constants t)
    ((:EAGAIN "EAGAIN"))
    ((:EWOULDBLOCK "EWOULDBLOCK"))
    ((:EINPROGRESS "EINPROGRESS"))
@@ -92,5 +92,5 @@
 
 #+linux
 (progn
-  (cvar ("errno" *errno*) :int)
+  (cvar ("errno" *errno*) error-code)
   )

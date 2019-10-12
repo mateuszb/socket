@@ -97,12 +97,13 @@
 	(t (cffi:mem-ref rxbytes :int32))))))
 
 (defmethod print-object ((sock socket) stream)
-  (format stream "#<socket: fd=~a>"
-	  (socket-fd sock)))
+  (print-unreadable-object (sock stream :type t)
+    (format stream "fd=~a" (socket-fd sock))))
 
 (defmethod print-object ((sock listen-socket) stream)
-  (format stream "#<listen-socket: fd=~a, port=~a>"
-	  (socket-fd sock) (socket-listen-port sock)))
+  (print-unreadable-object (sock stream :type t)
+    (format stream "listen-fd=~a, port=~a"
+	    (socket-fd sock) (socket-listen-port sock))))
 
 (define-condition socket-error ()
   ((fd :type (signed-byte 32) :initform -1 :initarg :fd)
